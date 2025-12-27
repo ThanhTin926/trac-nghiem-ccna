@@ -2316,487 +2316,402 @@
 ];
 
         // Map đáp án đúng (index của mảng cac_lua_chon)
-        const correctAnswersMap = { 
-            "1": 3, "2": 2, "3": 1, "4": 1, "5": 2, 
-            "11": 1, "12": 2 
-        };
-
-        // Lấy danh sách Topic và Difficulty duy nhất
-        const topics = [...new Set(mockQuestions.map(q => q.topic))];
-        const difficulties = ['easy', 'medium', 'hard'];
-
-        // --- 2. TRẠNG THÁI ỨNG DỤNG (STATE) ---
-        const state = {
-            currentView: 'setup', // setup, quiz, results, history, stats
-            quizSettings: {
-                order: 'sequential',
-                timeLimit: 15,
-                numberOfQuestions: 5,
-                difficulty: 'all',
-                topic: 'all'
-            },
-            currentQuestions: [],
-            currentQuestionIndex: 0,
-            selectedAnswers: {},
-            timeLeft: 0,
-            isTimerActive: false,
-            quizHistory: [],
-            bookmarkedQuestions: new Set(),
-            userStats: { totalAttempts: 0, totalCorrect: 0, totalQuestions: 0, bestScore: 0, topicPerformance: {} },
-            timer: null
-        };
-
-        // --- 3. CÁC HÀM XỬ LÝ LOGIC (CORE) ---
-
-        function getFilteredQuestions() {
-            return mockQuestions.filter(question => {
-                const difficultyMatch = state.quizSettings.difficulty === 'all' || question.level === state.quizSettings.difficulty;
-                const topicMatch = state.quizSettings.topic === 'all' || question.topic === state.quizSettings.topic;
-                return difficultyMatch && topicMatch;
-            });
-        }
-
-        function generateQuestions() {
-            const filtered = getFilteredQuestions();
-            if (filtered.length === 0) {
-                state.currentQuestions = [];
-                return;
-            }
+        const correctAnswersMap = { "1": 3, "2": 2, "3": 1, "4": 1, "5": 2, "11": 1, "12": 2 };
+            const topics = [...new Set(mockQuestions.map(q => q.topic))];
+            const difficulties = ['easy', 'medium', 'hard'];
+        
+            // --- 2. CẤU HÌNH & TRẠNG THÁI ---
             
-            let selectedQuestions = [...filtered];
-            // Xử lý ngẫu nhiên
-            if (state.quizSettings.order === 'random') {
-                selectedQuestions.sort(() => 0.5 - Math.random());
-            }
-            
-            // Cắt lấy số lượng câu hỏi yêu cầu
-            const numQuestions = Math.min(state.quizSettings.numberOfQuestions, selectedQuestions.length);
-            state.currentQuestions = selectedQuestions.slice(0, numQuestions);
-        }
-
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function getCorrectAnswerIndex(question) { 
-            return correctAnswersMap[question.id] !== undefined ? correctAnswersMap[question.id] : 0; 
-        }
-
-        function startQuiz() {
-            // 1. Tạo câu hỏi dựa trên setting
-            generateQuestions();
-            
-            // 2. Kiểm tra nếu không có câu hỏi nào
-            if (state.currentQuestions.length === 0) {
-                alert("Không có câu hỏi nào phù hợp với bộ lọc này!");
-                return;
-            }
-
-            // 3. Reset trạng thái
-            state.timeLeft = state.quizSettings.timeLimit * 60;
-            state.isTimerActive = true;
-            state.currentQuestionIndex = 0;
-            state.selectedAnswers = {};
-            state.bookmarkedQuestions = new Set();
-            state.userStats.totalAttempts++;
-
-            // 4. Bắt đầu Timer
-            if (state.timer) clearInterval(state.timer);
-            state.timer = setInterval(() => {
-                if (state.isTimerActive && state.timeLeft > 0) {
-                    state.timeLeft--;
-                    // Cập nhật giao diện timer (nếu đang ở trang quiz)
-                    const timerEl = document.getElementById('timerDisplay');
-                    if (timerEl) timerEl.innerText = formatTime(state.timeLeft);
-                } else if (state.timeLeft === 0 && state.isTimerActive) {
-                    finishQuiz();
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: { sans: ['Inter', 'sans-serif'] },
+                        colors: {
+                            primary: '#2563eb', primary_hover: '#1d4ed8', secondary: '#475569',
+                            background: '#f8fafc', surface: '#ffffff', success: '#10b981', warning: '#f59e0b', error: '#ef4444'
+                        }
+                    }
                 }
-            }, 1000);
-
-            // 5. Chuyển view
-            state.currentView = 'quiz';
-            renderView();
-        }
-
-        function finishQuiz() {
-            state.isTimerActive = false;
-            if (state.timer) { clearInterval(state.timer); state.timer = null; }
-
-            let correctAnswers = 0;
-            const topicStats = { ...state.userStats.topicPerformance };
-
-            state.currentQuestions.forEach((question, index) => {
-                const selectedAnswer = state.selectedAnswers[index];
-                const isCorrect = selectedAnswer !== undefined && selectedAnswer === getCorrectAnswerIndex(question);
-                
-                if (isCorrect) {
-                    correctAnswers++;
-                    topicStats[question.topic] = (topicStats[question.topic] || 0) + 1;
-                } else {
-                    topicStats[question.topic] = topicStats[question.topic] || 0;
-                }
-            });
-
-            const score = Math.round((correctAnswers / state.currentQuestions.length) * 100);
-
-            const newResult = {
-                id: Date.now(),
-                date: new Date().toLocaleString(),
-                totalQuestions: state.currentQuestions.length,
-                correctAnswers,
-                score,
-                timeLimit: state.quizSettings.timeLimit,
-                order: state.quizSettings.order,
-                difficulty: state.quizSettings.difficulty,
-                topic: state.quizSettings.topic
+            }
+        
+            const state = {
+                currentView: 'setup',
+                // Đảm bảo questions luôn có dữ liệu
+                questions: mockQuestions, 
+                quizSettings: { order: 'sequential', timeLimit: 15, numberOfQuestions: 5, difficulty: 'all', topic: 'all' },
+                currentQuestions: [],
+                currentQuestionIndex: 0,
+                selectedAnswers: {},
+                timeLeft: 0,
+                isTimerActive: false,
+                quizHistory: [],
+                bookmarkedQuestions: new Set(),
+                userStats: { totalAttempts: 0, totalCorrect: 0, totalQuestions: 0, bestScore: 0, topicPerformance: {} },
+                timer: null
             };
-
-            state.quizHistory.unshift(newResult);
-            state.userStats.totalCorrect += correctAnswers;
-            state.userStats.totalQuestions += state.currentQuestions.length;
-            state.userStats.bestScore = Math.max(state.userStats.bestScore, score);
-            state.userStats.topicPerformance = topicStats;
-
-            state.currentView = 'results';
-            renderView();
-        }
-
-        // --- 4. HÀM RENDER GIAO DIỆN (VIEW) ---
-
-        function renderView() {
-            const app = document.getElementById('app');
-            // Xóa sạch nội dung cũ trước khi render mới
-            app.innerHTML = ''; 
-
-            switch (state.currentView) {
-                case 'setup':
-                    app.innerHTML = getSetupHTML();
-                    attachSetupEvents();
-                    break;
-                case 'quiz':
-                    app.innerHTML = getQuizHTML();
-                    attachQuizEvents();
-                    break;
-                case 'results':
-                    app.innerHTML = getResultsHTML();
-                    attachResultsEvents();
-                    break;
-                case 'history':
-                    app.innerHTML = getPlaceholderHTML('Lịch sử', 'history');
-                    attachPlaceholderEvents();
-                    break;
-                case 'statistics':
-                    app.innerHTML = getPlaceholderHTML('Thống kê', 'chart-pie');
-                    attachPlaceholderEvents();
-                    break;
+        
+            // --- 3. LOGIC CHÍNH ---
+        
+            function getFilteredQuestions() {
+                return state.questions.filter(question => {
+                    const difficultyMatch = state.quizSettings.difficulty === 'all' || question.level === state.quizSettings.difficulty;
+                    const topicMatch = state.quizSettings.topic === 'all' || question.topic === state.quizSettings.topic;
+                    return difficultyMatch && topicMatch;
+                });
             }
-        }
-
-        // --- VIEW: SETUP ---
-
-        function getSetupHTML() {
-            const filteredQuestions = getFilteredQuestions();
-            return `
-                <div class="text-center mb-8">
-                    <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4 mx-auto">
-                        <i class="fas fa-graduation-cap text-primary text-2xl"></i>
+        
+            function generateQuestions() {
+                const filtered = getFilteredQuestions();
+                if (filtered.length === 0) {
+                    state.currentQuestions = [];
+                    return;
+                }
+                let selectedQuestions = [...filtered];
+                if (state.quizSettings.order === 'random') {
+                    selectedQuestions.sort(() => 0.5 - Math.random());
+                }
+                const numQuestions = Math.min(state.quizSettings.numberOfQuestions, selectedQuestions.length);
+                state.currentQuestions = selectedQuestions.slice(0, numQuestions);
+            }
+        
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+        
+            function getCorrectAnswerIndex(question) { 
+                return correctAnswersMap[question.id] !== undefined ? correctAnswersMap[question.id] : 0; 
+            }
+        
+            function toggleBookmark(questionId) {
+                if (state.bookmarkedQuestions.has(questionId)) state.bookmarkedQuestions.delete(questionId);
+                else state.bookmarkedQuestions.add(questionId);
+                renderView();
+            }
+        
+            function handleAnswerSelect(questionIndex, answerIndex) {
+                state.selectedAnswers[questionIndex] = answerIndex;
+                renderView();
+            }
+        
+            // --- HÀM START QUIZ (Đã sửa lỗi) ---
+            function startQuiz() {
+                // BƯỚC 1: Tạo danh sách câu hỏi
+                generateQuestions();
+        
+                // BƯỚC 2: Kiểm tra nếu danh sách rỗng
+                if (!state.currentQuestions || state.currentQuestions.length === 0) {
+                    alert("Không tìm thấy câu hỏi phù hợp với cài đặt của bạn (Chủ đề/Độ khó). Vui lòng chọn lại!");
+                    return;
+                }
+        
+                // BƯỚC 3: Reset trạng thái
+                state.timeLeft = state.quizSettings.timeLimit * 60;
+                state.isTimerActive = true;
+                state.currentQuestionIndex = 0;
+                state.selectedAnswers = {};
+                state.bookmarkedQuestions = new Set();
+                state.userStats.totalAttempts++;
+        
+                // BƯỚC 4: Timer
+                if (state.timer) clearInterval(state.timer);
+                state.timer = setInterval(() => {
+                    if (state.isTimerActive && state.timeLeft > 0) {
+                        state.timeLeft--;
+                        const timerEl = document.getElementById('timerDisplay');
+                        if (timerEl) timerEl.innerText = formatTime(state.timeLeft);
+                    } else if (state.timeLeft === 0 && state.isTimerActive) {
+                        finishQuiz();
+                    }
+                }, 1000);
+        
+                // BƯỚC 5: Chuyển màn hình
+                state.currentView = 'quiz';
+                renderView();
+            }
+        
+            function finishQuiz() {
+                state.isTimerActive = false;
+                if (state.timer) { clearInterval(state.timer); state.timer = null; }
+                
+                let correctAnswers = 0;
+                const topicStats = { ...state.userStats.topicPerformance };
+                
+                state.currentQuestions.forEach((question, index) => {
+                    const selectedAnswer = state.selectedAnswers[index];
+                    const isCorrect = selectedAnswer !== undefined && selectedAnswer === getCorrectAnswerIndex(question);
+                    if (isCorrect) {
+                        correctAnswers++;
+                        topicStats[question.topic] = (topicStats[question.topic] || 0) + 1;
+                    }
+                });
+        
+                const score = Math.round((correctAnswers / state.currentQuestions.length) * 100);
+                const newResult = {
+                    id: Date.now(),
+                    date: new Date().toLocaleString(),
+                    totalQuestions: state.currentQuestions.length,
+                    correctAnswers,
+                    score,
+                    timeLimit: state.quizSettings.timeLimit,
+                    order: state.quizSettings.order,
+                    difficulty: state.quizSettings.difficulty,
+                    topic: state.quizSettings.topic
+                };
+        
+                state.quizHistory.unshift(newResult);
+                state.userStats.totalCorrect += correctAnswers;
+                state.userStats.totalQuestions += state.currentQuestions.length;
+                state.userStats.bestScore = Math.max(state.userStats.bestScore, score);
+                state.userStats.topicPerformance = topicStats;
+        
+                state.currentView = 'results';
+                renderView();
+            }
+        
+            // --- 4. RENDER VIEW (Hàm hiển thị) ---
+        
+            function renderView() {
+                const app = document.getElementById('app');
+                if (!app) return;
+                app.innerHTML = ''; // Xóa nội dung cũ
+        
+                switch (state.currentView) {
+                    case 'setup': renderSetupView(app); break;
+                    case 'quiz': renderQuizView(app); break;
+                    case 'results': renderResultsView(app); break;
+                    case 'history': renderPlaceholder(app, 'Lịch sử', 'history'); break;
+                    case 'statistics': renderPlaceholder(app, 'Thống kê', 'chart-pie'); break;
+                }
+            }
+        
+            function renderSetupView(container) {
+                const filteredQuestions = getFilteredQuestions();
+                container.innerHTML = `
+                    <div class="text-center mb-8">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4 mx-auto">
+                            <i class="fas fa-graduation-cap text-primary text-2xl"></i>
+                        </div>
+                        <h1 class="text-3xl font-bold text-slate-800">Ôn Thi Mạng Máy Tính</h1>
+                        <p class="text-slate-500 mt-2">Hệ thống trắc nghiệm kiến thức tiêu chuẩn</p>
                     </div>
-                    <h1 class="text-3xl font-bold text-slate-800">Ôn Thi Mạng Máy Tính</h1>
-                    <p class="text-slate-500 mt-2">Hệ thống trắc nghiệm kiến thức tiêu chuẩn</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div class="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Số lượng câu hỏi</label>
-                        <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden">
-                            <button id="decreaseNumQuestions" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-r border-slate-200"><i class="fas fa-minus"></i></button>
-                            <input type="number" id="numQuestionsInput" value="${state.quizSettings.numberOfQuestions}" class="flex-1 text-center py-2 outline-none text-slate-800" readonly>
-                            <button id="increaseNumQuestions" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><i class="fas fa-plus"></i></button>
+        
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="p-5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Số lượng câu hỏi</label>
+                            <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden">
+                                <button id="decreaseNumQuestions" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-r border-slate-200"><i class="fas fa-minus"></i></button>
+                                <input type="number" id="numQuestionsInput" value="${state.quizSettings.numberOfQuestions}" class="flex-1 text-center py-2 outline-none text-slate-800" readonly>
+                                <button id="increaseNumQuestions" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">Tối đa: ${filteredQuestions.length} câu</p>
                         </div>
-                        <p class="text-xs text-slate-500 mt-2">Tối đa: ${filteredQuestions.length} câu</p>
-                    </div>
-
-                    <div class="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Thời gian (phút)</label>
-                         <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden">
-                            <button id="decreaseTime" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-r border-slate-200"><i class="fas fa-minus"></i></button>
-                            <input type="number" id="timeInput" value="${state.quizSettings.timeLimit}" class="flex-1 text-center py-2 outline-none text-slate-800" readonly>
-                            <button id="increaseTime" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><i class="fas fa-plus"></i></button>
+        
+                        <div class="p-5 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Thời gian (phút)</label>
+                                <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden">
+                                <button id="decreaseTime" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-r border-slate-200"><i class="fas fa-minus"></i></button>
+                                <input type="number" id="timeInput" value="${state.quizSettings.timeLimit}" class="flex-1 text-center py-2 outline-none text-slate-800" readonly>
+                                <button id="increaseTime" class="px-4 py-2 hover:bg-slate-100 text-slate-600 border-l border-slate-200"><i class="fas fa-plus"></i></button>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                             <label class="block text-sm font-semibold text-slate-700 mb-2">Độ khó</label>
-                            <select id="difficultySelect" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                                <option value="all" ${state.quizSettings.difficulty === 'all' ? 'selected' : ''}>Tất cả</option>
-                                ${difficulties.map(diff => `<option value="${diff}" ${state.quizSettings.difficulty === diff ? 'selected' : ''}>${diff.charAt(0).toUpperCase() + diff.slice(1)}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div>
-                             <label class="block text-sm font-semibold text-slate-700 mb-2">Chủ đề</label>
-                            <select id="topicSelect" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                                <option value="all" ${state.quizSettings.topic === 'all' ? 'selected' : ''}>Tất cả</option>
-                                ${topics.map(t => `<option value="${t}" ${state.quizSettings.topic === t ? 'selected' : ''}>${t}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div>
-                             <label class="block text-sm font-semibold text-slate-700 mb-2">Chế độ</label>
-                            <div class="flex rounded-lg shadow-sm">
-                                <button id="sequentialBtn" class="flex-1 py-2.5 text-sm font-medium rounded-l-lg border border-r-0 ${state.quizSettings.order === 'sequential' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}">Tuần tự</button>
-                                <button id="randomBtn" class="flex-1 py-2.5 text-sm font-medium rounded-r-lg border ${state.quizSettings.order === 'random' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}">Ngẫu nhiên</button>
+        
+                        <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Độ khó</label>
+                                <select id="difficultySelect" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                                    <option value="all" ${state.quizSettings.difficulty === 'all' ? 'selected' : ''}>Tất cả</option>
+                                    ${difficulties.map(diff => `<option value="${diff}" ${state.quizSettings.difficulty === diff ? 'selected' : ''}>${diff.charAt(0).toUpperCase() + diff.slice(1)}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Chủ đề</label>
+                                <select id="topicSelect" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                                    <option value="all" ${state.quizSettings.topic === 'all' ? 'selected' : ''}>Tất cả</option>
+                                    ${topics.map(t => `<option value="${t}" ${state.quizSettings.topic === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Chế độ</label>
+                                <div class="flex rounded-lg shadow-sm">
+                                    <button id="sequentialBtn" class="flex-1 py-2.5 text-sm font-medium rounded-l-lg border border-r-0 ${state.quizSettings.order === 'sequential' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}">Tuần tự</button>
+                                    <button id="randomBtn" class="flex-1 py-2.5 text-sm font-medium rounded-r-lg border ${state.quizSettings.order === 'random' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}">Ngẫu nhiên</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-slate-200">
-                    <div class="flex gap-3">
-                         <button id="historyBtn" class="text-slate-600 hover:text-primary text-sm font-medium transition-colors"><i class="fas fa-history mr-1"></i> Lịch sử</button>
-                         <button id="statisticsBtn" class="text-slate-600 hover:text-primary text-sm font-medium transition-colors"><i class="fas fa-chart-pie mr-1"></i> Thống kê</button>
-                    </div>
-                    <button id="startBtn" class="w-full sm:w-auto px-8 py-3 bg-primary hover:bg-primary_hover text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center cursor-pointer">
-                        <i class="fas fa-play mr-2"></i> Bắt đầu làm bài
-                    </button>
-                </div>
-            `;
-        }
-
-        function attachSetupEvents() {
-            // Start Button Logic
-            document.getElementById('startBtn').onclick = startQuiz;
-
-            // Number of Questions
-            document.getElementById('decreaseNumQuestions').onclick = () => {
-                if(state.quizSettings.numberOfQuestions > 1) {
-                    state.quizSettings.numberOfQuestions--;
-                    renderView(); // Re-render để cập nhật input
-                }
-            };
-            document.getElementById('increaseNumQuestions').onclick = () => {
-                if(state.quizSettings.numberOfQuestions < getFilteredQuestions().length) {
-                    state.quizSettings.numberOfQuestions++;
-                    renderView();
-                }
-            };
-
-            // Time
-            document.getElementById('decreaseTime').onclick = () => {
-                if(state.quizSettings.timeLimit > 1) {
-                    state.quizSettings.timeLimit--;
-                    renderView();
-                }
-            };
-            document.getElementById('increaseTime').onclick = () => {
-                if(state.quizSettings.timeLimit < 120) {
-                    state.quizSettings.timeLimit++;
-                    renderView();
-                }
-            };
-
-            // Filters & Order
-            document.getElementById('difficultySelect').onchange = (e) => {
-                state.quizSettings.difficulty = e.target.value;
-                // Reset số câu hỏi về max nếu bộ lọc thay đổi
-                state.quizSettings.numberOfQuestions = Math.min(5, getFilteredQuestions().length);
-                renderView();
-            };
-            document.getElementById('topicSelect').onchange = (e) => {
-                state.quizSettings.topic = e.target.value;
-                state.quizSettings.numberOfQuestions = Math.min(5, getFilteredQuestions().length);
-                renderView();
-            };
-            document.getElementById('sequentialBtn').onclick = () => { state.quizSettings.order = 'sequential'; renderView(); };
-            document.getElementById('randomBtn').onclick = () => { state.quizSettings.order = 'random'; renderView(); };
-
-            // Extra views
-            document.getElementById('historyBtn').onclick = () => { state.currentView = 'history'; renderView(); };
-            document.getElementById('statisticsBtn').onclick = () => { state.currentView = 'statistics'; renderView(); };
-        }
-
-        // --- VIEW: QUIZ ---
-
-        function getQuizHTML() {
-            const currentQuestion = state.currentQuestions[state.currentQuestionIndex];
-            const selectedAnswer = state.selectedAnswers[state.currentQuestionIndex];
-            const isBookmarked = state.bookmarkedQuestions.has(currentQuestion.id);
-
-            return `
-                <div class="flex justify-between items-center mb-6">
-                    <button id="backToSetupBtn" class="text-slate-500 hover:text-slate-800 text-sm"><i class="fas fa-arrow-left mr-1"></i> Thoát</button>
-                    <div class="flex items-center gap-4">
-                        <span class="text-sm font-semibold text-primary bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                            <i class="far fa-clock mr-1"></i> <span id="timerDisplay">${formatTime(state.timeLeft)}</span>
-                        </span>
-                        <button id="bookmarkBtn" class="${isBookmarked ? 'text-warning' : 'text-slate-300 hover:text-warning'} transition-colors"><i class="${isBookmarked ? 'fas' : 'far'} fa-bookmark text-lg"></i></button>
-                    </div>
-                </div>
-
-                <div class="mb-2 flex items-center gap-2">
-                     <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Câu ${state.currentQuestionIndex + 1}/${state.currentQuestions.length}</span>
-                     <span class="px-2 py-0.5 rounded text-xs font-medium ${currentQuestion.level === 'easy' ? 'bg-green-100 text-green-700' : currentQuestion.level === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">${currentQuestion.level}</span>
-                </div>
-
-                <h2 class="text-xl md:text-2xl font-semibold text-slate-800 mb-6 leading-relaxed">${currentQuestion.cau_hoi}</h2>
-                
-                ${currentQuestion.link_hinh_anh ? `<div class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"><img src="${currentQuestion.link_hinh_anh}" class="max-h-64 mx-auto object-contain"></div>` : ''}
-
-                <div class="space-y-3 mb-8">
-                    ${currentQuestion.cac_lua_chon.map((opt, idx) => `
-                        <button id="answer-${idx}" class="w-full text-left p-4 rounded-lg border-2 transition-all group ${selectedAnswer === idx ? 'border-primary bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}">
-                            <div class="flex items-center">
-                                <span class="w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${selectedAnswer === idx ? 'border-primary' : 'border-slate-300 group-hover:border-blue-300'}">
-                                    ${selectedAnswer === idx ? '<div class="w-3 h-3 bg-primary rounded-full"></div>' : ''}
-                                </span>
-                                <span class="${selectedAnswer === idx ? 'text-primary font-medium' : 'text-slate-700'}">${opt}</span>
-                            </div>
+        
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-slate-200">
+                        <div class="flex gap-3">
+                                <button id="historyBtn" class="text-slate-600 hover:text-primary text-sm font-medium transition-colors"><i class="fas fa-history mr-1"></i> Lịch sử</button>
+                                <button id="statisticsBtn" class="text-slate-600 hover:text-primary text-sm font-medium transition-colors"><i class="fas fa-chart-pie mr-1"></i> Thống kê</button>
+                        </div>
+                        <button id="startBtn" class="w-full sm:w-auto px-8 py-3 bg-primary hover:bg-primary_hover text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center cursor-pointer">
+                            <i class="fas fa-play mr-2"></i> Bắt đầu làm bài
                         </button>
-                    `).join('')}
-                </div>
-
-                <div class="flex justify-between items-center pt-6 border-t border-slate-100">
-                    <button id="prevBtn" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-50" ${state.currentQuestionIndex === 0 ? 'disabled' : ''}>Trước</button>
-                    ${state.currentQuestionIndex < state.currentQuestions.length - 1 
-                        ? `<button id="nextBtn" class="px-6 py-2 bg-primary hover:bg-primary_hover text-white rounded-lg shadow disabled:opacity-50" ${selectedAnswer === undefined ? 'disabled' : ''}>Tiếp theo <i class="fas fa-chevron-right ml-1"></i></button>` 
-                        : `<button id="finishBtn" class="px-6 py-2 bg-success hover:bg-emerald-600 text-white rounded-lg shadow">Hoàn thành</button>`}
-                </div>
-            `;
-        }
-
-        function attachQuizEvents() {
-            const currentQuestion = state.currentQuestions[state.currentQuestionIndex];
-
-            // Back button
-            document.getElementById('backToSetupBtn').onclick = () => {
-                if(confirm("Bạn có chắc muốn thoát bài làm không?")) {
-                    clearInterval(state.timer);
-                    state.currentView = 'setup';
-                    renderView();
-                }
-            };
-
-            // Bookmark
-            document.getElementById('bookmarkBtn').onclick = () => {
-                if (state.bookmarkedQuestions.has(currentQuestion.id)) state.bookmarkedQuestions.delete(currentQuestion.id);
-                else state.bookmarkedQuestions.add(currentQuestion.id);
-                renderView(); // Re-render to update icon
-            };
-
-            // Answer selection
-            currentQuestion.cac_lua_chon.forEach((_, idx) => {
-                document.getElementById(`answer-${idx}`).onclick = () => {
-                    state.selectedAnswers[state.currentQuestionIndex] = idx;
-                    renderView();
-                };
-            });
-
-            // Navigation
-            const prevBtn = document.getElementById('prevBtn');
-            if (prevBtn && !prevBtn.disabled) {
-                prevBtn.onclick = () => {
-                    if(state.currentQuestionIndex > 0) {
-                        state.currentQuestionIndex--;
-                        renderView();
-                    }
-                };
-            }
-
-            const nextBtn = document.getElementById('nextBtn');
-            if (nextBtn) {
-                nextBtn.onclick = () => {
-                    if(state.selectedAnswers[state.currentQuestionIndex] !== undefined) {
-                        state.currentQuestionIndex++;
-                        renderView();
-                    }
-                };
-            }
-
-            const finishBtn = document.getElementById('finishBtn');
-            if (finishBtn) {
-                finishBtn.onclick = finishQuiz;
-            }
-        }
-
-        // --- VIEW: RESULTS ---
-
-        function getResultsHTML() {
-            const res = state.quizHistory[0];
-            return `
-                <div class="text-center mb-10">
-                    <div class="text-5xl font-bold ${res.score >= 80 ? 'text-success' : res.score >= 50 ? 'text-warning' : 'text-error'} mb-2">${res.score}%</div>
-                    <p class="text-slate-500">Bạn trả lời đúng ${res.correctAnswers}/${res.totalQuestions} câu</p>
-                    <div class="mt-4 flex justify-center gap-4">
-                        <button id="newQuizBtn" class="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary_hover shadow">Làm bài mới</button>
-                        <button id="viewHistoryBtn" class="px-5 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50">Xem lịch sử</button>
                     </div>
-                </div>
-
-                <div class="border-t border-slate-200 pt-6">
-                    <h3 class="font-bold text-slate-800 mb-4">Chi tiết câu trả lời</h3>
-                    <div class="space-y-4">
-                        ${state.currentQuestions.map((q, i) => {
-                            const uAns = state.selectedAnswers[i];
-                            const cAns = getCorrectAnswerIndex(q);
-                            const isCorr = uAns === cAns;
-                            return `
-                                <div class="p-4 rounded-lg border ${isCorr ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
-                                    <div class="flex gap-3">
-                                        <div class="mt-1 ${isCorr ? 'text-success' : 'text-error'}"><i class="fas ${isCorr ? 'fa-check-circle' : 'fa-times-circle'}"></i></div>
-                                        <div class="flex-1">
-                                            <p class="font-medium text-slate-800 text-sm mb-2">${q.cau_hoi}</p>
-                                            <p class="text-xs text-slate-500 mb-1">Bạn chọn: <span class="font-semibold ${isCorr ? 'text-success' : 'text-error'}">${q.cac_lua_chon[uAns]}</span></p>
-                                            ${!isCorr ? `<p class="text-xs text-success">Đáp án đúng: <span class="font-semibold">${q.cac_lua_chon[cAns]}</span></p>` : ''}
-                                            ${q.giai_thich ? `<div class="mt-2 text-xs bg-white/50 p-2 rounded text-slate-600">💡 ${q.giai_thich}</div>` : ''}
+                `;
+                setupEventListeners();
+            }
+        
+            function renderQuizView(container) {
+                // --- SỬA LỖI QUAN TRỌNG TẠI ĐÂY ---
+                // 1. Lấy câu hỏi hiện tại
+                const currentQuestion = state.currentQuestions[state.currentQuestionIndex];
+                
+                // 2. Kiểm tra nếu câu hỏi bị null/undefined (Lỗi bạn gặp phải)
+                if (!currentQuestion) {
+                    container.innerHTML = `<div class="text-center py-10 text-error">Lỗi: Không tải được dữ liệu câu hỏi. Vui lòng quay lại.<br><button id="forceBackBtn" class="mt-4 px-4 py-2 bg-slate-200 rounded">Quay lại Setup</button></div>`;
+                    document.getElementById('forceBackBtn').onclick = () => { state.currentView = 'setup'; renderView(); };
+                    return;
+                }
+        
+                // 3. Đảm bảo danh sách đáp án là mảng hợp lệ
+                const options = Array.isArray(currentQuestion.cac_lua_chon) ? currentQuestion.cac_lua_chon : [];
+        
+                const selectedAnswer = state.selectedAnswers[state.currentQuestionIndex];
+                const isBookmarked = state.bookmarkedQuestions.has(currentQuestion.id);
+                
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <button id="backToSetupBtn" class="text-slate-500 hover:text-slate-800 text-sm"><i class="fas fa-arrow-left mr-1"></i> Thoát</button>
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm font-semibold text-primary bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                                <i class="far fa-clock mr-1"></i> <span id="timerDisplay">${formatTime(state.timeLeft)}</span>
+                            </span>
+                            <button id="bookmarkBtn" class="${isBookmarked ? 'text-warning' : 'text-slate-300 hover:text-warning'} transition-colors"><i class="${isBookmarked ? 'fas' : 'far'} fa-bookmark text-lg"></i></button>
+                        </div>
+                    </div>
+        
+                    <div class="mb-2 flex items-center gap-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Câu ${state.currentQuestionIndex + 1}/${state.currentQuestions.length}</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-medium ${currentQuestion.level === 'easy' ? 'bg-green-100 text-green-700' : currentQuestion.level === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">${currentQuestion.level}</span>
+                    </div>
+        
+                    <h2 class="text-xl md:text-2xl font-semibold text-slate-800 mb-6 leading-relaxed">${currentQuestion.cau_hoi}</h2>
+                    
+                    ${currentQuestion.link_hinh_anh ? `<div class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"><img src="${currentQuestion.link_hinh_anh}" class="max-h-64 mx-auto object-contain"></div>` : ''}
+        
+                    <div class="space-y-3 mb-8">
+                        ${options.map((opt, idx) => `
+                            <button id="answer-${idx}" class="w-full text-left p-4 rounded-lg border-2 transition-all group ${selectedAnswer === idx ? 'border-primary bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}">
+                                <div class="flex items-center">
+                                    <span class="w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${selectedAnswer === idx ? 'border-primary' : 'border-slate-300 group-hover:border-blue-300'}">
+                                        ${selectedAnswer === idx ? '<div class="w-3 h-3 bg-primary rounded-full"></div>' : ''}
+                                    </span>
+                                    <span class="${selectedAnswer === idx ? 'text-primary font-medium' : 'text-slate-700'}">${opt}</span>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>
+        
+                    <div class="flex justify-between items-center pt-6 border-t border-slate-100">
+                        <button id="prevBtn" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-50" ${state.currentQuestionIndex === 0 ? 'disabled' : ''}>Trước</button>
+                        ${state.currentQuestionIndex < state.currentQuestions.length - 1 
+                            ? `<button id="nextBtn" class="px-6 py-2 bg-primary hover:bg-primary_hover text-white rounded-lg shadow disabled:opacity-50" ${selectedAnswer === undefined ? 'disabled' : ''}>Tiếp theo <i class="fas fa-chevron-right ml-1"></i></button>` 
+                            : `<button id="finishBtn" class="px-6 py-2 bg-success hover:bg-emerald-600 text-white rounded-lg shadow">Hoàn thành</button>`}
+                    </div>
+                `;
+        
+                // Gán sự kiện
+                document.getElementById('backToSetupBtn').onclick = () => { if(confirm('Hủy bài làm?')) { clearInterval(state.timer); state.currentView = 'setup'; renderView(); }};
+                document.getElementById('bookmarkBtn').onclick = () => toggleBookmark(currentQuestion.id);
+                document.getElementById('prevBtn').onclick = () => { if(state.currentQuestionIndex > 0) { state.currentQuestionIndex--; renderView(); }};
+                
+                if(document.getElementById('nextBtn')) {
+                    document.getElementById('nextBtn').onclick = () => { if(state.selectedAnswers[state.currentQuestionIndex] !== undefined) { state.currentQuestionIndex++; renderView(); }};
+                }
+                if(document.getElementById('finishBtn')) {
+                    document.getElementById('finishBtn').onclick = finishQuiz;
+                }
+        
+                options.forEach((_, idx) => {
+                    const btn = document.getElementById(`answer-${idx}`);
+                    if(btn) btn.onclick = () => handleAnswerSelect(state.currentQuestionIndex, idx);
+                });
+            }
+        
+            function renderResultsView(container) {
+                const res = state.quizHistory[0];
+                container.innerHTML = `
+                    <div class="text-center mb-10">
+                        <div class="text-5xl font-bold ${res.score >= 80 ? 'text-success' : res.score >= 50 ? 'text-warning' : 'text-error'} mb-2">${res.score}%</div>
+                        <p class="text-slate-500">Bạn trả lời đúng ${res.correctAnswers}/${res.totalQuestions} câu</p>
+                        <div class="mt-4 flex justify-center gap-4">
+                            <button id="newQuizBtn" class="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary_hover shadow">Làm bài mới</button>
+                            <button id="viewHistoryBtn" class="px-5 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50">Xem lịch sử</button>
+                        </div>
+                    </div>
+        
+                    <div class="border-t border-slate-200 pt-6">
+                        <h3 class="font-bold text-slate-800 mb-4">Chi tiết câu trả lời</h3>
+                        <div class="space-y-4">
+                            ${state.currentQuestions.map((q, i) => {
+                                const uAns = state.selectedAnswers[i];
+                                const cAns = getCorrectAnswerIndex(q);
+                                const isCorr = uAns === cAns;
+                                return `
+                                    <div class="p-4 rounded-lg border ${isCorr ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
+                                        <div class="flex gap-3">
+                                            <div class="mt-1 ${isCorr ? 'text-success' : 'text-error'}"><i class="fas ${isCorr ? 'fa-check-circle' : 'fa-times-circle'}"></i></div>
+                                            <div class="flex-1">
+                                                <p class="font-medium text-slate-800 text-sm mb-2">${q.cau_hoi}</p>
+                                                <p class="text-xs text-slate-500 mb-1">Bạn chọn: <span class="font-semibold ${isCorr ? 'text-success' : 'text-error'}">${q.cac_lua_chon[uAns]}</span></p>
+                                                ${!isCorr ? `<p class="text-xs text-success">Đáp án đúng: <span class="font-semibold">${q.cac_lua_chon[cAns]}</span></p>` : ''}
+                                                ${q.giai_thich ? `<div class="mt-2 text-xs bg-white/50 p-2 rounded text-slate-600">💡 ${q.giai_thich}</div>` : ''}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            `;
-                        }).join('')}
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
-                </div>
-            `;
-        }
-
-        function attachResultsEvents() {
-            document.getElementById('newQuizBtn').onclick = () => {
-                state.currentView = 'setup';
+                `;
+                document.getElementById('newQuizBtn').onclick = () => { state.currentView = 'setup'; renderView(); };
+                document.getElementById('viewHistoryBtn').onclick = () => { state.currentView = 'history'; renderView(); };
+            }
+        
+            function renderPlaceholder(container, title, icon) {
+                container.innerHTML = `
+                    <div class="flex items-center mb-6">
+                        <button id="backFromPlaceholder" class="mr-4 text-slate-500 hover:text-primary"><i class="fas fa-arrow-left"></i></button>
+                        <h2 class="text-2xl font-bold text-slate-800">${title}</h2>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-8 text-center border border-slate-200 border-dashed">
+                        <i class="fas fa-${icon} text-4xl text-slate-300 mb-3"></i>
+                        <p class="text-slate-500">Chức năng đang được cập nhật giao diện.</p>
+                    </div>
+                `;
+                document.getElementById('backFromPlaceholder').onclick = () => { state.currentView = 'setup'; renderView(); };
+            }
+        
+            // --- SETUP LISTENERS ---
+            function setupEventListeners() {
+                const bind = (id, handler) => { const el = document.getElementById(id); if (el) el.onclick = handler; };
+                const bindChange = (id, handler) => { const el = document.getElementById(id); if (el) el.onchange = handler; };
+        
+                // NÚT BẮT ĐẦU (START) - Quan trọng
+                bind('startBtn', startQuiz); 
+        
+                bind('decreaseNumQuestions', () => { if(state.quizSettings.numberOfQuestions > 1) {state.quizSettings.numberOfQuestions--; renderView();} });
+                bind('increaseNumQuestions', () => { if(state.quizSettings.numberOfQuestions < getFilteredQuestions().length) {state.quizSettings.numberOfQuestions++; renderView();} });
+                bind('decreaseTime', () => { if(state.quizSettings.timeLimit > 1) {state.quizSettings.timeLimit--; renderView();} });
+                bind('increaseTime', () => { if(state.quizSettings.timeLimit < 120) {state.quizSettings.timeLimit++; renderView();} });
+                bind('sequentialBtn', () => { state.quizSettings.order = 'sequential'; renderView(); });
+                bind('randomBtn', () => { state.quizSettings.order = 'random'; renderView(); });
+                bind('historyBtn', () => { state.currentView = 'history'; renderView(); });
+                bind('statisticsBtn', () => { state.currentView = 'statistics'; renderView(); });
+        
+                bindChange('difficultySelect', (e) => { state.quizSettings.difficulty = e.target.value; renderView(); });
+                bindChange('topicSelect', (e) => { state.quizSettings.topic = e.target.value; renderView(); });
+            }
+        
+            // --- KHỞI CHẠY ---
+            document.addEventListener('DOMContentLoaded', () => {
                 renderView();
-            };
-            document.getElementById('viewHistoryBtn').onclick = () => {
-                state.currentView = 'history';
-                renderView();
-            };
-        }
-
-        // --- VIEW: PLACEHOLDERS (History/Stats) ---
-
-        function getPlaceholderHTML(title, icon) {
-            return `
-                <div class="flex items-center mb-6">
-                    <button id="backFromPlaceholder" class="mr-4 text-slate-500 hover:text-primary"><i class="fas fa-arrow-left"></i></button>
-                    <h2 class="text-2xl font-bold text-slate-800">${title}</h2>
-                </div>
-                <div class="bg-slate-50 rounded-xl p-8 text-center border border-slate-200 border-dashed">
-                    <i class="fas fa-${icon} text-4xl text-slate-300 mb-3"></i>
-                    <p class="text-slate-500">Chức năng đang được cập nhật giao diện.</p>
-                </div>
-            `;
-        }
-
-        function attachPlaceholderEvents() {
-            document.getElementById('backFromPlaceholder').onclick = () => {
-                state.currentView = 'setup';
-                renderView();
-            };
-        }
-
-        // --- KHỞI CHẠY ỨNG DỤNG ---
-        document.addEventListener('DOMContentLoaded', () => {
-            renderView();
-        });
-
-    </script>
+            });
+        </script>
 </body>
 </html>
+
